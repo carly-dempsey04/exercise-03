@@ -1,0 +1,162 @@
+---
+title: "EDAchallenge"
+format: html
+editor: visual
+---
+
+## Assignment 3 - Data Anlaytics
+
+Beginning with preliminaries, I load in the data-wrangling csv dataset downloaded from the Github Repo
+
+```{r}
+#Adding my packages to my library
+library(tidyverse)
+library(skimr)
+library(ggplot2)
+library(dplyr)
+#Uploading data-wrangling csv as dataframe "d"
+d <- read.csv("C:/Users/Admin-D26999/Desktop/data_sets/data-wrangling.csv", sep = ",", stringsAsFactors = FALSE)
+class(d)
+```
+
+Exploratory Data Analysis undergone in the chunk below in order to gather an understanding of the dataset
+
+```{r}
+#Lists all column names
+names(d)
+#Pulling the first six rows with "head" 
+head(d)
+#Summary identifications
+summary(d)
+#Identifying how many rows and columns are present
+dim(d)
+#Using skimr package to produce table image summaries for first 6 rows
+head(skim(d))
+```
+
+## Beginning the Assignment Challenges
+
+1.  Creating a new variable named BSD (body size dimorphism) in the dataframe and reviewing 1 through 10
+
+    Body Size Dimorphism: the ratio of average male to female body mass
+
+    ```{r}
+    d$BSD <- d$Body_mass_male_mean/d$Body_mass_female_mean
+    d <- d[order(d$BSD, decreasing = TRUE), ]
+    d[1:10, ]
+    ```
+
+2.  Creating a new variable named sex_ratio in the dataframe and reviewing rows 1 through 10
+
+    Sex_Ratio: ratio of the number of adult females to adult males in the average group
+
+    ```{r}
+    d$sex_ratio <- d$AdultMales/d$AdultFemale
+    d <- d[order(d$sex_ratio, decreasing = TRUE), ]
+    d[1:10, ]
+    ```
+
+3.  Creating a new variable named DI (Defensibility Index) in the dataframe
+
+    Defensibility Index: ratio of day range length to the diameter of the home range
+
+    ```{r}
+    #First I need to calculate my diameter using the formula to find the aread of a circle 
+    d$radius <- sqrt(d$HomeRange_km2/pi)
+    d$diameter <- d$radius*2
+    #Then to create the DI variable, I use the new diameter variable to input into the ratio
+    d$DI <- d$DayLength_km/d$diameter
+    #Adding DI variable to my dataframe
+    d <- d[order(d$DI, decreasing = TRUE), ]
+    d[1:10, ]
+    ```
+
+4.  Plotting the relationship between day range length and group size
+
+    ```{r}
+    #Plotting the relationship OVERALL (pov = plotting overall)
+    pov <- d %>%
+      filter(Move > 0, DayLength_km > 0) %>% #forced to remove NA
+      ggplot(aes(x = log(Move), y = log(DayLength_km))) + geom_point()
+    pov
+    #Plotting the relationship BY FAMILY (pbf = plotting by family)
+    pbf <- d%>%
+      filter(Move > 0, DayLength_km > 0) %>% #forced to remove NA
+      ggplot(aes(x = log(Move), y = log(DayLength_km))) + geom_point() + facet_wrap(~ Family)
+    pbf
+    ```
+
+-   It appears, by qualitative assumptions, there is some correlation between movement time and travel distance across certain families. Overall examination reveals little direct observational correlation between movement time and travel distance.
+
+-   Cercopithecidae seems to have correlation between high movement time and travel distance.
+
+-   Data was transformmed through the log function to fix graphical skew
+
+5.  Plotting the relationship between day range length and group size
+
+    ```{r}
+    #Plotting the relationship OVERALL (pov = plotting overall )
+    pov <- d %>%
+      filter(MeanGroupSize > 0, DayLength_km > 0) %>% #forced to remove NA
+      ggplot(aes(x = log(MeanGroupSize), y = log(DayLength_km))) + geom_point() + geom_smooth(method = "lm", fullrange = FALSE, na.rm = TRUE)
+    pov
+    #Plotting the relationship BY FAMILY (pbf = plotting by family)
+    pbf <- d%>%
+      filter(MeanGroupSize > 0, DayLength_km > 0) %>% #forced to remove NA
+      ggplot(aes(x = log(MeanGroupSize), y = log(DayLength_km))) + geom_point() + facet_wrap(~ Family) + geom_smooth(method = "lm", fullrange = FALSE, na.rm = TRUE)
+    pbf
+    ```
+
+-   There appears to be a slight observational correlation between mean group size and travel distance, with a regression line added to note observation (I have a general dislike for qualitative correlation and felt the need to add this based off of Module 9 Bivariate Scatterplots Challenge 1 to give indication)
+
+-   The correlation appears to be strongest in the Cercopithecidae and Cebidae families
+
+-   Data was once again transformed through the log function to adjust for graphical skew
+
+6.  Plotting the relationship between canine size dimorphism and body size dimorphism overall and by family
+
+    ```{r}
+    #Plotting the relationship OVERALL (pov = plotting overall )
+    pov <- d %>%
+      filter(BSD > 0, Canine_Dimorphism > 0) %>% #forced to remove NA
+      ggplot(aes(x = BSD, y = Canine_Dimorphism)) + geom_point() + geom_smooth(method = "lm", fullrange = FALSE, na.rm = TRUE)
+    pov
+    #Plotting the relationship BY FAMILY (pbf = plotting by family)
+    pbf <- d%>%
+      filter(BSD > 0, Canine_Dimorphism > 0) %>% #forced to remove NA
+      ggplot(aes(x = BSD, y = Canine_Dimorphism)) + geom_point() + facet_wrap(~ Family) 
+    pbf
+    ```
+
+-   There appears to be no taxa-related correlation between size dimorphism and canine dimorphism, as the family grouping graphs do not show any clear linear trends.
+
+7.  Creating a new variable called "diet-strategy" that lists:
+
+    Frugivore if fruits makes up \>50%
+
+    Folivore if leaves make up \>50% of the diet
+
+    Omnivore if diet data is available but neither of the previous assumptions are met
+
+    Followed by creation of a boxplot
+
+    ```{r}
+    #Creating the Three variables using the mutate() and ifelse() functions
+    df <- mutate(d, diet_strategy = ifelse(Fruit >= 50, "frugivore", ifelse(Leaves >= 50, "folivore", ifelse(Fruit < 50 & Leaves < 50, "omnivore", NA))))
+    #Creating three boxplots for each dietary strategy that examines group size as the variable 
+    df %>%
+      filter(diet_strategy == "frugivore") %>%
+      ggplot(aes(y = MeanGroupSize, x ="")) + geom_boxplot() + labs(title = "Mean Group Size of Frugivore Species")
+
+    df %>%
+      filter(diet_strategy == "folivore") %>%
+      ggplot(aes(y = MeanGroupSize, x ="")) + geom_boxplot() + labs(title = "Mean Group Size of Folivore Species")
+
+    df %>%
+      filter(diet_strategy == "omnivore") %>%
+      ggplot(aes(y = MeanGroupSize, x ="")) + geom_boxplot() + labs(title = "Mean Group Size of Omnivore Species")
+    ```
+
+-   It appears, from the boxplots provided
+
+8.  
